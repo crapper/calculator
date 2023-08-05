@@ -7,6 +7,12 @@
   pointer-events: none;
 }
 
+.Button{
+  text-align: center;
+  height: 10vmin;
+  width: 10vmin;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .App-logo {
     animation: App-logo-spin infinite 20s linear;
