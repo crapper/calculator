@@ -5,6 +5,7 @@ export type Digit0to9 = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9
 export type Digit1to9 = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
 export type Dot = '.';
 export type Operator = '+' | '-' | '*' | '/' | '(' | ')';
+export type Bracket = '(' | ')'
 
 export function isDigit0to9(s: string): s is Digit0to9 {
   return s === '0' || s === '1' || s === '2' || s === '3' || s === '4' || s === '5' || s === '6' || s === '7' || s === '8' || s === '9';
@@ -19,7 +20,11 @@ export function isDot(s: string): s is Dot {
 }
 
 export function isOperator(s: string): s is Operator {
-  return s === '+' || s === '-' || s === '*' || s === '/' || s === '(' || s ===')';
+  return s === '+' || s === '-' || s === '*' || s === '/';
+}
+
+export function isBracket(s: string): s is Bracket {
+  return s === '(' || s ===')';
 }
 
 export function accept(...ignore: any[]): true {
@@ -48,7 +53,7 @@ export class StartToken extends Token {
   }
 
   next() {
-    return [NumberToken];
+    return [NumberToken, BracketToken];
   }
 
   get text(): string {
@@ -80,7 +85,7 @@ export class NumberToken extends Token {
   }
 
   next() {
-    return [OperatorToken];
+    return [OperatorToken, BracketToken];
   }
 
   get text(): string {
@@ -100,8 +105,6 @@ export class OperatorToken extends Token {
         this.priority = 0
       }else if (char === "*" || char === "/"){
         this.priority = 1
-      }else{
-        this.priority = 2
       }
       this.value = char;
       return true;
@@ -110,7 +113,39 @@ export class OperatorToken extends Token {
   }
 
   next() {
-    return [NumberToken];
+    return [NumberToken, BracketToken];
+  }
+
+  get text(): string {
+    return this.value;
+  }
+
+  get prior(): number{
+    return this.priority
+  }
+}
+
+export class BracketToken extends Token {
+  private value: string = "";
+  private priority = -1;
+
+  constructor(input: Input) { super(input); }
+
+  join(char: string): boolean {
+    if (isBracket(char) && this.value === "") {
+      this.priority = 2
+      this.value = char;
+      return true;
+    }
+    return false;
+  }
+
+  next() {
+    // return [NumberToken, OperatorToken, BracketToken];
+    if (this.value === "(")
+      return [NumberToken, BracketToken];
+    else
+      return [OperatorToken, NumberToken, BracketToken];
   }
 
   get text(): string {
@@ -131,25 +166,24 @@ export class Input {
   initialize() {
     this.tokens = [new StartToken(this)];
     this.postfix_tokens = []
+    this.onUpdate?.();
   }
 
   has_balanced_bracket(): boolean{
-    let arr_bracket: Number[]  = []
+    let arr_open_bracket: Number[]  = []
+    let arr_close_bracket: Number[] = []
     this.tokens.forEach(tok => {
       if (tok.text === "("){
-        arr_bracket.push(1)
+        arr_open_bracket.push(1)
       }else if (tok.text === ")"){
-        if (arr_bracket.length === 0){
-          return false
-        }
-        arr_bracket.pop()
+        arr_close_bracket.push(2)
       }
     })
-    return (arr_bracket.length === 0)
+    return (arr_open_bracket.length === arr_close_bracket.length)
   }
 
   join(char: string): boolean {
-    if (this.tokens.length === 0) {
+    if (this.tokens.length === 0 || (char === ")" && this.has_balanced_bracket())) {
       return false;
     }
 
@@ -159,11 +193,9 @@ export class Input {
       this.onUpdate?.();
       return true;
     }
-
     const nextTokens = token.next();
 
     for (const nextToken of nextTokens) {
-      console.log("test")
       const token = new nextToken(this);
       if (token.join(char)) {
         this.tokens.push(token);
@@ -179,13 +211,26 @@ export class Input {
     if (this.tokens.length === 0) return true;
     for (let i = 0; i < this.tokens.length; i++) {
       //Get a "-", "." number type
+      if ((this.tokens[i] instanceof NumberToken)){
+        if (this.tokens[i+1] instanceof BracketToken && this.tokens[i+1].text === "("){
+          let temp_mulp = new OperatorToken(null as any)
+          temp_mulp.join("*")
+          this.tokens.splice(i+1, 0, temp_mulp)
+        }
+      }
       if ((this.tokens[i] instanceof NumberToken) && isNaN(Number(this.tokens[i].text))) {
-        return false;
+        if (this.tokens[i].text === "-"){
+          let temp_negative = new NumberToken(null as any)
+          temp_negative.join("-")
+          temp_negative.join("1")
+          this.tokens[i] = temp_negative
+        }else
+          return false
       }
       if (this.tokens[i] instanceof OperatorToken && this.tokens[i+1] === undefined) {
         return false;
       }
-      if (!this.has_balanced_bracket()){
+      if (this.has_balanced_bracket() === false){
         return false
       }
     }
@@ -211,24 +256,23 @@ export class Input {
     for (let i = 0; i < this.tokens.length; i++) {
       if ((this.tokens[i] instanceof NumberToken)){
         this.postfix_tokens.push(this.tokens[i])
-      }else if((this.tokens[i] instanceof OperatorToken)){
-
+      }else if((this.tokens[i] instanceof OperatorToken || this.tokens[i] instanceof BracketToken)){
         if (this.tokens[i].text === ')'){
-          temp_bracket_len_count = 0
+          // temp_bracket_len_count = 0
           while (temp_operator.length !== 0){
             if (temp_operator[temp_operator.length-1].text !== '('){
               this.postfix_tokens.push(temp_operator.pop()!)
-              temp_bracket_len_count++
+              // temp_bracket_len_count++
             }else{
               temp_operator.pop()
               break
             }
           }
-          if (temp_bracket_len_count === 0){
-            console.log("Error")
-            this.initialize()
-            return false
-          }
+          // if (temp_bracket_len_count === 0){
+          //   console.log("Error")
+          //   this.initialize()
+          //   return false
+          // }
           continue
         }
 
@@ -238,8 +282,12 @@ export class Input {
         }
 
         while(temp_operator.length !== 0){
-          if ((temp_operator[temp_operator.length-1] as OperatorToken).prior >= (this.tokens[i] as OperatorToken).prior){
+          if ((temp_operator[temp_operator.length-1] as OperatorToken).prior >= (this.tokens[i] as OperatorToken).prior && !(temp_operator[temp_operator.length-1] instanceof BracketToken) && !(this.tokens[i] instanceof BracketToken)) {
             this.postfix_tokens.push(temp_operator.pop()!)
+            if (temp_operator.length === 0){
+              temp_operator.push(this.tokens[i])
+              break
+            }
           }else {
             temp_operator.push(this.tokens[i])
             break
@@ -248,9 +296,8 @@ export class Input {
         continue
       }
     }
-    // console.log(temp_operator)
-    // this.postfix_tokens = this.postfix_tokens.concat(temp_operator)
     this.postfix_tokens.push(...temp_operator.reverse())
+    // console.log(this.postfix_tokens)
     return true
   }
 
@@ -263,37 +310,45 @@ export class Input {
   }
 
   evaluation (){
-    let temp_ans: Token[] = []
+    let temp_ans: Token[] = [];
+    temp_ans.splice(0, temp_ans.length)
     for (let i = 0; i< this.postfix_tokens.length;i++){
       if (this.postfix_tokens[i] instanceof NumberToken){
         temp_ans.push(this.postfix_tokens[i])
       }else if (this.postfix_tokens[i] instanceof OperatorToken){
-        let a = temp_ans.pop() as NumberToken
         let b = temp_ans.pop() as NumberToken
+        let a = temp_ans.pop() as NumberToken
+        // console.log(a, b, this.postfix_tokens[i].text)
         let ans = this.performExpression(a, b, this.postfix_tokens[i] as OperatorToken)
         temp_ans.push(this.NumberToNumberToken(ans))
       }
+      // console.log(...temp_ans)
     }
-    this.initialize()
     this.tokens = temp_ans
   }
 
   calculate() {
     if(this.validation()){
+      // console.log(this.tokens)
       this.ToPostFix()
       console.log(this.postfix_tokens)
       this.evaluation()
-      console.log(this.tokens)
-      this.onUpdate?.()
+      // console.log(this.tokens)
     }else {
       console.log("Wrong Syntax")
       this.initialize()
     }
+    this.onUpdate?.()
   }
 
   getTokens(): ReadonlyArray<Token> {
     return this.tokens;
   }
+
+  getPostfixTokens(): ReadonlyArray<Token> {
+    return this.postfix_tokens;
+  }
+
 }
 
 export function useUpdate() {
