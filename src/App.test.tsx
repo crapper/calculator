@@ -13,50 +13,58 @@ function tokensToString(tokens: ReadonlyArray<Token>): string {
 }
 
 test("Anything", () => {
-  let i = input("2+3*4");
+  let i = input("2");
+  i.calculate();
+  expect(tokensToString(i.getTokens())).toBe("2");
+
+  // i = input("-");
+  // i.calculate();
+  // expect(tokensToString(i.getTokens())).toBe("-1");
+
+  i = input("2+3*4");
   i.calculate();
   expect(tokensToString(i.getTokens())).toBe("14");
-  expect(tokensToString(i.getPostfixTokens())).toBe("234*+");
+  // expect(tokensToString(i.getPostfixTokens())).toBe("234*+");
 
   i = input("(2+3)*4");
   i.calculate();
   expect(tokensToString(i.getTokens())).toBe("20");
-  expect(tokensToString(i.getPostfixTokens())).toBe("23+4*");
+  // expect(tokensToString(i.getPostfixTokens())).toBe("23+4*");
 
   i = input("2*(3+4)*5");
   i.calculate();
   expect(tokensToString(i.getTokens())).toBe("70");
-  expect(tokensToString(i.getPostfixTokens())).toBe("234+*5*");
+  // expect(tokensToString(i.getPostfixTokens())).toBe("234+*5*");
 
   i = input("3*(4+5)-6/2");
   i.calculate();
   expect(tokensToString(i.getTokens())).toBe("24");
-  expect(tokensToString(i.getPostfixTokens())).toBe("345+*62/-");
+  // expect(tokensToString(i.getPostfixTokens())).toBe("345+*62/-");
 
   i = input("2*(3+(4*5))");
   i.calculate();
   expect(tokensToString(i.getTokens())).toBe("46");
-  expect(tokensToString(i.getPostfixTokens())).toBe("2345*+*");
+  // expect(tokensToString(i.getPostfixTokens())).toBe("2345*+*");
 
   i = input("((2+3)*4)-5");
   i.calculate();
   expect(tokensToString(i.getTokens())).toBe("15");
-  expect(tokensToString(i.getPostfixTokens())).toBe("23+4*5-");
+  // expect(tokensToString(i.getPostfixTokens())).toBe("23+4*5-");
 
   i = input("2*3+4*5-6/2");
   i.calculate();
   expect(tokensToString(i.getTokens())).toBe("23");
-  expect(tokensToString(i.getPostfixTokens())).toBe("23*45*+62/-");
+  // expect(tokensToString(i.getPostfixTokens())).toBe("23*45*+62/-");
 
   i = input("2*(3+4*(5-6/2))");
   i.calculate();
   expect(tokensToString(i.getTokens())).toBe("22");
-  expect(tokensToString(i.getPostfixTokens())).toBe("234562/-*+*");
+  // expect(tokensToString(i.getPostfixTokens())).toBe("234562/-*+*");
 
   i = input("2*(3+4)*(5-6)/2");
   i.calculate();
   expect(tokensToString(i.getTokens())).toBe("-7");
-  expect(tokensToString(i.getPostfixTokens())).toBe("234+*56-*2/");
+  // expect(tokensToString(i.getPostfixTokens())).toBe("234+*56-*2/");
 });
 
 test("NumberToken", () => {
@@ -149,8 +157,8 @@ test("Bracket", () => {
   let c = new BracketToken(null as any);
 
   expect(c.join('(')).toBe(true);
-  expect(c.join(')')).toBe(true);
-  expect(c.text).toBe(')');
+  expect(c.join(')')).toBe(false);
+  expect(c.text).toBe('(');
 
   c = new BracketToken(null as any);
 

@@ -24,11 +24,26 @@ export function isOperator(s: string): s is Operator {
 }
 
 export function isBracket(s: string): s is Bracket {
-  return s === '(' || s ===')';
+  return s === '(' || s === ')';
 }
 
 export function accept(...ignore: any[]): true {
   return true;
+}
+
+export function performExpression(a: NumberToken, b: NumberToken, c: OperatorToken): Number {
+  switch (c.text) {
+    case "+":
+      return a.number + b.number;
+    case "-":
+      return a.number - b.number;
+    case "*":
+      return a.number * b.number;
+    case "/":
+      return a.number / b.number;
+    default:
+      return 0;
+  }
 }
 
 export abstract class Token {
@@ -91,6 +106,10 @@ export class NumberToken extends Token {
   get text(): string {
     return this.value;
   }
+
+  get number(): number {
+    return this.value === "-" ? -1 : Number(this.value);
+  }
 }
 
 export class OperatorToken extends Token {
@@ -101,9 +120,9 @@ export class OperatorToken extends Token {
 
   join(char: string): boolean {
     if (isOperator(char)) {
-      if (char === "+" || char === "-"){
+      if (char === "+" || char === "-") {
         this.priority = 0
-      }else if (char === "*" || char === "/"){
+      } else if (char === "*" || char === "/") {
         this.priority = 1
       }
       this.value = char;
@@ -120,7 +139,7 @@ export class OperatorToken extends Token {
     return this.value;
   }
 
-  get prior(): number{
+  get prior(): number {
     return this.priority
   }
 }
@@ -148,11 +167,19 @@ export class BracketToken extends Token {
       return [OperatorToken, NumberToken, BracketToken];
   }
 
+  get isOpening(): boolean {
+    return this.value === "(";
+  }
+
+  get isClosing(): boolean {
+    return this.value === ")";
+  }
+
   get text(): string {
     return this.value;
   }
 
-  get prior(): number{
+  get prior(): number {
     return this.priority
   }
 }
@@ -169,26 +196,17 @@ export class Input {
     this.onUpdate?.();
   }
 
-  has_balanced_bracket(): boolean{
-    let arr_open_bracket: Number[]  = []
-    let arr_close_bracket: Number[] = []
-    this.tokens.forEach(tok => {
-      if (tok.text === "("){
-        arr_open_bracket.push(1)
-      }else if (tok.text === ")"){
-        arr_close_bracket.push(2)
-      }
-    })
-    return (arr_open_bracket.length === arr_close_bracket.length)
+  hasBalancedBracket(): boolean {
+    return this.tokens.filter(tok => tok.text === "(").length === this.tokens.filter(tok => tok.text === ")").length;
   }
 
   join(char: string): boolean {
-    if (this.tokens.length === 0 || (char === ")" && this.has_balanced_bracket())) {
+    if (this.tokens.length === 0 || (char === ")" && this.hasBalancedBracket())) {
       return false;
     }
 
     const token = this.tokens[this.tokens.length - 1];
-    
+
     if (token.join(char)) {
       this.onUpdate?.();
       return true;
@@ -207,63 +225,51 @@ export class Input {
     return false;
   }
 
-  validation () {
-    if (this.tokens.length === 0) return true;
-    for (let i = 0; i < this.tokens.length; i++) {
-      //Get a "-", "." number type
-      if ((this.tokens[i] instanceof NumberToken)){
-        if (this.tokens[i+1] instanceof BracketToken && this.tokens[i+1].text === "("){
-          let temp_mulp = new OperatorToken(null as any)
-          temp_mulp.join("*")
-          this.tokens.splice(i+1, 0, temp_mulp)
-        }
-      }
-      if ((this.tokens[i] instanceof NumberToken) && isNaN(Number(this.tokens[i].text))) {
-        if (this.tokens[i].text === "-"){
-          let temp_negative = new NumberToken(null as any)
-          temp_negative.join("-")
-          temp_negative.join("1")
-          this.tokens[i] = temp_negative
-        }else
-          return false
-      }
-      if (this.tokens[i] instanceof OperatorToken && this.tokens[i+1] === undefined) {
-        return false;
-      }
-      if (this.has_balanced_bracket() === false){
-        return false
-      }
-    }
+  validation() {
+    if (this.tokens.length === 0) return false;
+
+    if (this.tokens.at(-1) instanceof OperatorToken) return false;
+
+    if (this.hasBalancedBracket() === false) return false;
+
     return true;
   }
 
-  performExpression (a: NumberToken, b: NumberToken, c: OperatorToken): Number{
-    if (c.text === "+"){
-      return Number(a.text) + Number(b.text)
-    }else if (c.text === "-"){
-      return Number(a.text) - Number(b.text)
-    }else if (c.text === "*"){
-      return Number(a.text) * Number(b.text)
-    }else if (c.text === "/"){
-      return Number(a.text) / Number(b.text)
+  preCompile() {
+    for (let i = 0; i < this.tokens.length; i++) {
+      const current = this.tokens[i];
+      if (current instanceof NumberToken) {
+        const next = this.tokens[i + 1];
+        if (next instanceof BracketToken && next.isOpening) {
+          let mul = new OperatorToken(this);
+          mul.join("*");
+          this.tokens.splice(i + 1, 0, mul);
+        }
+      } else if (current instanceof BracketToken && current.isClosing) {
+        const next = this.tokens[i + 1];
+        if (next instanceof NumberToken) {
+          let mul = new OperatorToken(this);
+          mul.join("*");
+          this.tokens.splice(i + 1, 0, mul);
+        }
+      }
     }
-    return 0
   }
 
-  ToPostFix (): boolean {
+  ToPostFix(): boolean {
     let temp_operator: Token[] = []
     let temp_bracket_len_count = 0
     for (let i = 0; i < this.tokens.length; i++) {
-      if ((this.tokens[i] instanceof NumberToken)){
+      if ((this.tokens[i] instanceof NumberToken)) {
         this.postfix_tokens.push(this.tokens[i])
-      }else if((this.tokens[i] instanceof OperatorToken || this.tokens[i] instanceof BracketToken)){
-        if (this.tokens[i].text === ')'){
+      } else if ((this.tokens[i] instanceof OperatorToken || this.tokens[i] instanceof BracketToken)) {
+        if (this.tokens[i].text === ')') {
           // temp_bracket_len_count = 0
-          while (temp_operator.length !== 0){
-            if (temp_operator[temp_operator.length-1].text !== '('){
+          while (temp_operator.length !== 0) {
+            if (temp_operator[temp_operator.length - 1].text !== '(') {
               this.postfix_tokens.push(temp_operator.pop()!)
               // temp_bracket_len_count++
-            }else{
+            } else {
               temp_operator.pop()
               break
             }
@@ -276,19 +282,19 @@ export class Input {
           continue
         }
 
-        if (temp_operator.length === 0){
+        if (temp_operator.length === 0) {
           temp_operator.push(this.tokens[i])
           continue
         }
 
-        while(temp_operator.length !== 0){
-          if ((temp_operator[temp_operator.length-1] as OperatorToken).prior >= (this.tokens[i] as OperatorToken).prior && !(temp_operator[temp_operator.length-1] instanceof BracketToken) && !(this.tokens[i] instanceof BracketToken)) {
+        while (temp_operator.length !== 0) {
+          if ((temp_operator[temp_operator.length - 1] as OperatorToken).prior >= (this.tokens[i] as OperatorToken).prior && !(temp_operator[temp_operator.length - 1] instanceof BracketToken) && !(this.tokens[i] instanceof BracketToken)) {
             this.postfix_tokens.push(temp_operator.pop()!)
-            if (temp_operator.length === 0){
+            if (temp_operator.length === 0) {
               temp_operator.push(this.tokens[i])
               break
             }
-          }else {
+          } else {
             temp_operator.push(this.tokens[i])
             break
           }
@@ -301,25 +307,25 @@ export class Input {
     return true
   }
 
-  NumberToNumberToken (n: Number): NumberToken{
+  NumberToNumberToken(n: Number): NumberToken {
     let newToken = new NumberToken(null as any)
-    for (let i =0; i< String(n).length; i++){
+    for (let i = 0; i < String(n).length; i++) {
       newToken.join(String(n)[i])
     }
     return newToken
   }
 
-  evaluation (){
+  evaluation() {
     let temp_ans: Token[] = [];
     temp_ans.splice(0, temp_ans.length)
-    for (let i = 0; i< this.postfix_tokens.length;i++){
-      if (this.postfix_tokens[i] instanceof NumberToken){
+    for (let i = 0; i < this.postfix_tokens.length; i++) {
+      if (this.postfix_tokens[i] instanceof NumberToken) {
         temp_ans.push(this.postfix_tokens[i])
-      }else if (this.postfix_tokens[i] instanceof OperatorToken){
+      } else if (this.postfix_tokens[i] instanceof OperatorToken) {
         let b = temp_ans.pop() as NumberToken
         let a = temp_ans.pop() as NumberToken
         // console.log(a, b, this.postfix_tokens[i].text)
-        let ans = this.performExpression(a, b, this.postfix_tokens[i] as OperatorToken)
+        let ans = performExpression(a, b, this.postfix_tokens[i] as OperatorToken)
         temp_ans.push(this.NumberToNumberToken(ans))
       }
       // console.log(...temp_ans)
@@ -327,18 +333,95 @@ export class Input {
     this.tokens = temp_ans
   }
 
-  calculate() {
-    if(this.validation()){
-      // console.log(this.tokens)
-      this.ToPostFix()
-      console.log(this.postfix_tokens)
-      this.evaluation()
-      // console.log(this.tokens)
-    }else {
-      console.log("Wrong Syntax")
-      this.initialize()
+  calculate2() {
+    if (!this.validation()) {
+      console.log("Wrong Syntax");
+      this.initialize();
+      return;
     }
-    this.onUpdate?.()
+
+    this.preCompile();
+    // console.log(this.tokens)
+    this.ToPostFix()
+    console.log(this.postfix_tokens)
+    this.evaluation()
+    // console.log(this.tokens)
+
+    this.onUpdate?.();
+  }
+
+  calculate() {
+    if (!this.validation()) {
+      console.log("Wrong Syntax");
+      this.initialize();
+      return;
+    }
+
+    this.preCompile();
+
+    const output: NumberToken[] = [];
+    const stack: (BracketToken | OperatorToken)[] = []; // OpenBracket, Operator
+
+    const peek = () => {
+      return stack.at(-1);
+    }
+
+    const out = (token: NumberToken) => {
+      output.push(token);
+    }
+
+    const handlePop = () => {
+      const op = stack.pop()!;
+      if (op instanceof BracketToken) return undefined;
+
+      const b = output.pop()!;
+      const a = output.pop()!;
+
+      return performExpression(a, b, op);
+    }
+
+    const handleToken = (token: Token) => { // Number, Operator, OpenBracket  CloseBracket
+      if (token instanceof NumberToken) {
+        out(token);
+      } else if (token instanceof OperatorToken) {
+        const o1 = token;
+        let o2 = peek();
+
+        while (o2 instanceof OperatorToken && o1.prior <= o2.prior) {
+          out(this.NumberToNumberToken(handlePop()!));
+          o2 = peek();
+        }
+
+        stack.push(o1);
+      } else if (token instanceof BracketToken) {
+        if (token.isOpening) {
+          stack.push(token);
+        } else {
+          let o2 = peek();
+          while (!(o2 instanceof BracketToken)) {
+            out(this.NumberToNumberToken(handlePop()!));
+            o2 = peek();
+          }
+          stack.pop();
+        }
+      }
+    }
+
+    this.tokens.forEach(handleToken);
+
+    // XXX
+    if (stack.length > 0 && output.length < 2) {
+      this.initialize();
+      return;
+    }
+
+    while (stack.length > 0) {
+      out(this.NumberToNumberToken(handlePop()!));
+    }
+
+    this.tokens = output;
+
+    this.onUpdate?.();
   }
 
   getTokens(): ReadonlyArray<Token> {
@@ -364,315 +447,41 @@ export default function App() {
   const [input, setInput] = React.useState<Input>(new Input(updater));
 
   return (<div className="App">
-      <label>{
-        input.getTokens().map((token, index) => {
-          return <span key={index}>{token.text}</span>;
-        })
-      }</label>
-      <div>
-        <button className='Button' onClick={() => {input.join("(")}}>(</button>
-        <button className='Button' onClick={() => {input.join(")")}}>)</button>
-        <button className='Button'>%</button>
-        <button className='Button' onClick={() => {setInput(new Input(updater))}}>CE</button>
-      </div>
-      <div>
-        <button className='Button' onClick={() => {input.join("7")}}>7</button>
-        <button className='Button' onClick={() => {input.join("8")}}>8</button>
-        <button className='Button' onClick={() => {input.join("9")}}>9</button>
-        <button className='Button' onClick={() => {input.join("/")}}>÷</button>
-      </div>
-      <div>
-        <button className='Button' onClick={() => {input.join("4")}}>4</button>
-        <button className='Button' onClick={() => {input.join("5")}}>5</button>
-        <button className='Button' onClick={() => {input.join("6")}}>6</button>
-        <button className='Button' onClick={() => {input.join("*")}}>x</button>
-      </div>
-      <div>
-        <button className='Button' onClick={() => {input.join("1")}}>1</button>
-        <button className='Button' onClick={() => {input.join("2")}}>2</button>
-        <button className='Button' onClick={() => {input.join("3")}}>3</button>
-        <button className='Button' onClick={() => {input.join("-")}}>-</button>
-      </div>
-      <div>
-        <button className='Button' onClick={() => {input.join("0")}}>0</button>
-        <button className='Button' onClick={() => {input.join(".")}}>.</button>
-        <button className='Button' onClick={() => {input.calculate()}}>=</button>
-        <button className='Button' onClick={() => {input.join("+")}}>+</button>
-      </div>
-    </div>);
+    <label>{
+      input.getTokens().map((token, index) => {
+        return <span key={index}>{token.text}</span>;
+      })
+    }</label>
+    <div>
+      <button className='Button' onClick={() => { input.join("(") }}>(</button>
+      <button className='Button' onClick={() => { input.join(")") }}>)</button>
+      <button className='Button'>%</button>
+      <button className='Button' onClick={() => { setInput(new Input(updater)) }}>CE</button>
+    </div>
+    <div>
+      <button className='Button' onClick={() => { input.join("7") }}>7</button>
+      <button className='Button' onClick={() => { input.join("8") }}>8</button>
+      <button className='Button' onClick={() => { input.join("9") }}>9</button>
+      <button className='Button' onClick={() => { input.join("/") }}>÷</button>
+    </div>
+    <div>
+      <button className='Button' onClick={() => { input.join("4") }}>4</button>
+      <button className='Button' onClick={() => { input.join("5") }}>5</button>
+      <button className='Button' onClick={() => { input.join("6") }}>6</button>
+      <button className='Button' onClick={() => { input.join("*") }}>x</button>
+    </div>
+    <div>
+      <button className='Button' onClick={() => { input.join("1") }}>1</button>
+      <button className='Button' onClick={() => { input.join("2") }}>2</button>
+      <button className='Button' onClick={() => { input.join("3") }}>3</button>
+      <button className='Button' onClick={() => { input.join("-") }}>-</button>
+    </div>
+    <div>
+      <button className='Button' onClick={() => { input.join("0") }}>0</button>
+      <button className='Button' onClick={() => { input.join(".") }}>.</button>
+      <button className='Button' onClick={() => { input.calculate() }}>=</button>
+      <button className='Button' onClick={() => { input.join("+") }}>+</button>
+    </div>
+  </div>);
 };
-
-
-
-// import { useState } from 'react';
-// import './App.css';
-
-
-
-
-
-
-
-
-
-
-
-
-// enum Status{
-//   number, cutter, dotnumber
-// }
-
-// interface IState{
-//   text : string;
-//   stat : Status;
-// }
-
-// class Items implements IState{
-//   text: string;
-//   stat: Status;
-
-//   constructor(text: string, stat: Status){
-//     this.text = text;
-//     this.stat = stat;
-//   }
-
-//   public addBack(s: string){
-//     this.text += s;
-//   }
-
-//   public toNumber() {
-//     return Number(this.text); // NaN if not a number
-//   }
-// }
-
-// function App() {
-//   const [textstr, setTextstr] = useState('0');
-//   const [lstItems,] = useState<Items[]>([]);
-
-//   function isCutterSymbol(s: string){
-//     return s === '+' || s === '*' || s === '/' || s === '-';
-//   }
-
-//   function isPositive(s: string){
-//     return s === '+';
-//   }  
-
-//   function isNegative(s: string){
-//     return s === '-';
-//   }
-
-//   function isDot(s: string){
-//     return s === '.';
-//   }
-
-//   function ReRenderText(){
-//     console.log(lstItems);
-//     let s = '';
-//     lstItems.forEach((item) => {
-//       s += item.text;
-//     });
-//     if (s === '') s = '0';
-//     setTextstr(s);
-//   }
-
-//   function add(s: string)
-//   {
-//     // case 1 [] input -9, case 2 9 x - 10
-//     if (lstItems.length === 0 || (lstItems[lstItems.length - 1].stat === Status.cutter && !isNegative(lstItems[lstItems.length - 1].text))) {
-//       if (isNegative(s)) {
-//         if (lstItems.length !== 0 && isPositive(lstItems[lstItems.length - 1].text) && lstItems[lstItems.length - 1].stat !== Status.dotnumber) {
-//           lstItems.pop();
-//         }
-//         lstItems.push(new Items(s, Status.number));
-//         ReRenderText()
-//         return;
-//       }
-//     }
-//     if (isDot(s)) {
-//       if (lstItems.length !==0 && lstItems[lstItems.length - 1].stat === Status.dotnumber) {
-//         return;
-//       }
-//       console.log("1")
-//       if (lstItems.length === 0) {
-//         console.log("2")
-//         lstItems.push(new Items('0.', Status.dotnumber));
-//         ReRenderText()
-//         return;
-//       }
-//       else if (lstItems[lstItems.length - 1].stat === Status.number && !isNaN(lstItems[lstItems.length - 1].toNumber())) {
-//         console.log("3")
-//         lstItems[lstItems.length - 1].addBack(s);
-//         lstItems[lstItems.length - 1].stat = Status.dotnumber;
-//         ReRenderText()
-//         return;
-//       }else{
-//         console.log("4")
-//         lstItems.push(new Items('.', Status.dotnumber));
-//         ReRenderText()
-//         return;
-//       }
-//     }
-
-//     if (isCutterSymbol(s)) {
-//       if (lstItems.length!==0 && lstItems[lstItems.length - 1].stat === Status.number && isNegative(lstItems[lstItems.length - 1].text) && lstItems[lstItems.length - 1].stat !== Status.dotnumber) {
-//         lstItems.pop()
-//         if (lstItems.length !== 0 && lstItems[lstItems.length - 1].stat !== Status.cutter) { //for case 9 x - 10 -> remove - and do not add new +
-//           lstItems.push(new Items(s, Status.cutter));
-//         }
-//         ReRenderText()
-//         return
-//       }
-
-//       if (lstItems.length!==0 && isNaN(lstItems[lstItems.length - 1].toNumber()) && lstItems[lstItems.length - 1].stat !== Status.dotnumber) {
-//         lstItems.pop()
-//         lstItems.push(new Items(s, Status.cutter));
-//         ReRenderText()
-//         return
-//       }
-
-//       if (lstItems.length === 0) {
-//         lstItems.push(new Items('0', Status.number));
-//         lstItems.push(new Items(s, Status.cutter));
-//         ReRenderText()
-//         return
-//       }
-//       lstItems.push(new Items(s, Status.cutter));
-//       ReRenderText()
-//       return
-//     }
-//     else {
-//       if (lstItems.length === 0 || lstItems[lstItems.length - 1].stat === Status.cutter) {
-//         lstItems.push(new Items(s, Status.number));
-//         ReRenderText()
-//       }
-//       else {
-//         if (lstItems[lstItems.length - 1].text === '0' && s === '0') return;
-//         if (lstItems[lstItems.length - 1].text === '0')
-//           lstItems[lstItems.length - 1].text = s
-//         else
-//           lstItems[lstItems.length - 1].addBack(s);
-//         ReRenderText()
-//       }
-//     }
-//   }
-
-//   function validate(lst: Items[]){
-//     if (lst.length === 0) return true;
-    
-//     for (let i = 0; i < lst.length; i++) {
-//       //Get a "-", "." number type
-//       if ((lst[i].stat === Status.number || lst[i].stat === Status.dotnumber) && isNaN(lst[i].toNumber())) {
-//         return false;
-//       }
-//       if (lst[i].stat === Status.cutter && lst[i+1] === undefined) {
-//         return false;
-//       }
-//     }
-//     return true;
-//   }
-
-//   function calculate(){
-//     if (!validate(lstItems)) {
-//       console.error("Invalid input");
-//       clear();
-//       return;
-//     }
-//     var tempMulpDivPos: number[] = [];
-//     for (let i = 0; i < lstItems.length; i++) {
-//         if (lstItems[i].stat === Status.cutter && lstItems[i].text === '*' || lstItems[i].text === '/') {
-//           tempMulpDivPos.push(i);
-//         }
-//     }
-//     for (let i = 0; i < tempMulpDivPos.length; i++) {
-//       let temp = tempMulpDivPos[i];
-//       let a = lstItems[temp - 1].toNumber();
-//       let b = lstItems[temp + 1].toNumber();
-//       let c = 0;
-//       if (lstItems[temp].text === '*') {
-//         c = a * b;
-//       }
-//       else {
-//         c = a / b;
-//         if (b === 0) {
-//           console.error("Divide by zero");
-//           clear();
-//           return;
-//         }
-//       }
-//       lstItems.splice(temp - 1, 3, new Items(c.toString(), Status.number));
-//     }
-
-//     var tempAddSubPos: number[] = [];
-//     for (let i = 0; i < lstItems.length; i++) {
-//         if (lstItems[i].stat === Status.cutter && lstItems[i].text === '+' || lstItems[i].text === '-') {
-//           tempAddSubPos.push(i);
-//         }
-//     }
-//     for (let i = 0; i < tempAddSubPos.length; i++) {
-//       let temp = tempAddSubPos[i];
-//       let a = lstItems[temp - 1].toNumber();
-//       let b = lstItems[temp + 1].toNumber();
-//       let c = 0;
-//       if (lstItems[temp].text === '+') {
-//         c = a + b;
-//       }
-//       else {
-//         c = a - b;
-//       }
-//       lstItems.splice(temp - 1, 3, new Items(c.toString(), Status.number));
-//     }
-//     setTextstr(Number(lstItems[0].text).toFixed(2));
-//   }
-  
-
-//   function clear(){
-//     lstItems.splice(0, lstItems.length);
-//     setTextstr('0');
-//   }
-
-//   return (
-//     <div className="App">
-//       <label>{textstr}</label>
-//       <div>
-//         <button className='Button'>(</button>
-//         <button className='Button'>)</button>
-//         <button className='Button'>%</button>
-//         <button className='Button' onClick={() => {clear()}}>CE</button>
-//       </div>
-//       <div>
-//         <button className='Button' onClick={() => {add("7")}}>7</button>
-//         <button className='Button' onClick={() => {add("8")}}>8</button>
-//         <button className='Button' onClick={() => {add("9")}}>9</button>
-//         <button className='Button' onClick={() => {add("/")}}>÷</button>
-//       </div>
-//       <div>
-//         <button className='Button' onClick={() => {add("4")}}>4</button>
-//         <button className='Button' onClick={() => {add("5")}}>5</button>
-//         <button className='Button' onClick={() => {add("6")}}>6</button>
-//         <button className='Button' onClick={() => {add("*")}}>x</button>
-//       </div>
-//       <div>
-//         <button className='Button' onClick={() => {add("1")}}>1</button>
-//         <button className='Button' onClick={() => {add("2")}}>2</button>
-//         <button className='Button' onClick={() => {add("3")}}>3</button>
-//         <button className='Button' onClick={() => {add("-")}}>-</button>
-//       </div>
-//       <div>
-//         <button className='Button' onClick={() => {add("0")}}>0</button>
-//         <button className='Button' onClick={() => {add(".")}}>.</button>
-//         <button className='Button' onClick={() => {calculate()}}>=</button>
-//         <button className='Button' onClick={() => {add("+")}}>+</button>
-//       </div>
-      
-      
-//       {/* <button onClick={() => {add()}}>=</button> */}
-
-//       {/* <div>
-//         {
-//           lstItems.map((item) => item.text)
-//         }
-//       </div> */}
-//     </div>
-//   );
-// }
 
