@@ -31,7 +31,7 @@ export function accept(...ignore: any[]): true {
   return true;
 }
 
-export function performExpression(a: NumberToken, b: NumberToken, c: OperatorToken): Number {
+export function performExpression(a: NumberToken, b: NumberToken, c: OperatorToken): number {
   switch (c.text) {
     case "+":
       return a.number + b.number;
@@ -109,6 +109,12 @@ export class NumberToken extends Token {
 
   get number(): number {
     return this.value === "-" ? -1 : Number(this.value);
+  }
+
+  static from(num: number) {
+    const token = new NumberToken(null as any);
+    token.value = String(num);
+    return token;
   }
 }
 
@@ -307,14 +313,6 @@ export class Input {
     return true
   }
 
-  NumberToNumberToken(n: Number): NumberToken {
-    let newToken = new NumberToken(null as any)
-    for (let i = 0; i < String(n).length; i++) {
-      newToken.join(String(n)[i])
-    }
-    return newToken
-  }
-
   evaluation() {
     let temp_ans: Token[] = [];
     temp_ans.splice(0, temp_ans.length)
@@ -326,7 +324,7 @@ export class Input {
         let a = temp_ans.pop() as NumberToken
         // console.log(a, b, this.postfix_tokens[i].text)
         let ans = performExpression(a, b, this.postfix_tokens[i] as OperatorToken)
-        temp_ans.push(this.NumberToNumberToken(ans))
+        temp_ans.push(NumberToken.from(ans))
       }
       // console.log(...temp_ans)
     }
@@ -388,7 +386,7 @@ export class Input {
         let o2 = peek();
 
         while (o2 instanceof OperatorToken && o1.prior <= o2.prior) {
-          out(this.NumberToNumberToken(handlePop()!));
+          out(NumberToken.from(handlePop()!));
           o2 = peek();
         }
 
@@ -399,7 +397,7 @@ export class Input {
         } else {
           let o2 = peek();
           while (!(o2 instanceof BracketToken)) {
-            out(this.NumberToNumberToken(handlePop()!));
+            out(NumberToken.from(handlePop()!));
             o2 = peek();
           }
           stack.pop();
@@ -416,7 +414,7 @@ export class Input {
     }
 
     while (stack.length > 0) {
-      out(this.NumberToNumberToken(handlePop()!));
+      out(NumberToken.from(handlePop()!));
     }
 
     this.tokens = output;
