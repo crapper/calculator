@@ -220,9 +220,6 @@ export class Input {
   }
 
   join(char: string): boolean {
-    // if (this.tokens.length === 0 || (char === ")" && this.hasBalancedBracket())) {
-    //   return false;
-    // }
     if (this.tokens.length === 0) {
       return false;
     }
@@ -280,90 +277,6 @@ export class Input {
     }
   }
 
-  ToPostFix(): boolean {
-    let temp_operator: Token[] = []
-    let temp_bracket_len_count = 0
-    for (let i = 0; i < this.tokens.length; i++) {
-      if ((this.tokens[i] instanceof NumberToken)) {
-        this.postfix_tokens.push(this.tokens[i])
-      } else if ((this.tokens[i] instanceof OperatorToken || this.tokens[i] instanceof CloseBracketToken)) {
-          // temp_bracket_len_count = 0
-        while (temp_operator.length !== 0) {
-          if (temp_operator[temp_operator.length - 1].text !== '(') {
-            this.postfix_tokens.push(temp_operator.pop()!)
-            // temp_bracket_len_count++
-          } else {
-            temp_operator.pop()
-            break
-          }
-          // if (temp_bracket_len_count === 0){
-          //   console.log("Error")
-          //   this.initialize()
-          //   return false
-          // }
-          continue
-        }
-
-        if (temp_operator.length === 0) {
-          temp_operator.push(this.tokens[i])
-          continue
-        }
-
-        while (temp_operator.length !== 0) {
-          if ((temp_operator[temp_operator.length - 1] as OperatorToken).prior >= (this.tokens[i] as OperatorToken).prior && !(temp_operator[temp_operator.length - 1] instanceof OpenBracketToken) && !(this.tokens[i] instanceof OpenBracketToken) && !(temp_operator[temp_operator.length - 1] instanceof CloseBracketToken) && !(this.tokens[i] instanceof CloseBracketToken)) {
-            this.postfix_tokens.push(temp_operator.pop()!)
-            if (temp_operator.length === 0) {
-              temp_operator.push(this.tokens[i])
-              break
-            }
-          } else {
-            temp_operator.push(this.tokens[i])
-            break
-          }
-        }
-        continue
-      }
-    }
-    this.postfix_tokens.push(...temp_operator.reverse())
-    // console.log(this.postfix_tokens)
-    return true
-  }
-
-  evaluation() {
-    let temp_ans: Token[] = [];
-    temp_ans.splice(0, temp_ans.length)
-    for (let i = 0; i < this.postfix_tokens.length; i++) {
-      if (this.postfix_tokens[i] instanceof NumberToken) {
-        temp_ans.push(this.postfix_tokens[i])
-      } else if (this.postfix_tokens[i] instanceof OperatorToken) {
-        let b = temp_ans.pop() as NumberToken
-        let a = temp_ans.pop() as NumberToken
-        // console.log(a, b, this.postfix_tokens[i].text)
-        let ans = performExpression(a, b, this.postfix_tokens[i] as OperatorToken)
-        temp_ans.push(NumberToken.from(ans))
-      }
-      // console.log(...temp_ans)
-    }
-    this.tokens = temp_ans
-  }
-
-  calculate2() {
-    if (!this.validation()) {
-      console.log("Wrong Syntax");
-      this.initialize();
-      return;
-    }
-
-    this.preCompile();
-    // console.log(this.tokens)
-    this.ToPostFix()
-    console.log(this.postfix_tokens)
-    this.evaluation()
-    // console.log(this.tokens)
-
-    this.onUpdate?.();
-  }
-
   calculate() {
     if (!this.validation()) {
       console.log("Wrong Syntax");
@@ -419,8 +332,6 @@ export class Input {
     }
 
     this.tokens.forEach(handleToken);
-
-    // XXX
     if (stack.length > 0 && output.length < 2) {
       this.initialize();
       return;
@@ -495,4 +406,3 @@ export default function App() {
     </div>
   </div>);
 };
-
