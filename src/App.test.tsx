@@ -1,4 +1,4 @@
-import { NumberToken, OperatorToken, Input, BracketToken, Token } from "./App";
+import { NumberToken, OperatorToken, Input, OpenBracketToken, CloseBracketToken, Token } from "./App";
 
 export { }
 
@@ -16,10 +16,6 @@ test("Anything", () => {
   let i = input("2");
   i.calculate();
   expect(tokensToString(i.getTokens())).toBe("2");
-
-  // i = input("-");
-  // i.calculate();
-  // expect(tokensToString(i.getTokens())).toBe("-1");
 
   i = input("2+3*4");
   i.calculate();
@@ -153,14 +149,14 @@ test("Operator", () => {
   expect(c.text).toBe('');
 });
 
-test("Bracket", () => {
-  let c = new BracketToken(null as any);
+test("OpenBracket", () => {
+  let c = new OpenBracketToken(null as any);
 
   expect(c.join('(')).toBe(true);
   expect(c.join(')')).toBe(false);
   expect(c.text).toBe('(');
 
-  c = new BracketToken(null as any);
+  c = new OpenBracketToken(null as any);
 
   expect(c.join('+')).toBe(false);
   expect(c.join('-')).toBe(false);
@@ -172,7 +168,40 @@ test("Bracket", () => {
   expect(c.join('/')).toBe(false);
   expect(c.text).toBe('');
 
-  c = new BracketToken(null as any);
+  c = new OpenBracketToken(null as any);
+
+  expect(c.join('1')).toBe(false);
+  expect(c.join('2')).toBe(false);
+  expect(c.join('3')).toBe(false);
+  expect(c.join('.')).toBe(false);
+  expect(c.join('4')).toBe(false);
+  expect(c.join('5')).toBe(false);
+  expect(c.join('6')).toBe(false);
+  expect(c.join('.')).toBe(false);
+  expect(c.join('7')).toBe(false);
+  expect(c.text).toBe('');
+});
+
+test("CloseBracket", () => {
+  let c = new CloseBracketToken(input('('));
+
+  expect(c.join('(')).toBe(false);
+  expect(c.join(')')).toBe(true);
+  expect(c.text).toBe(')');
+
+  c = new CloseBracketToken(null as any);
+
+  expect(c.join('+')).toBe(false);
+  expect(c.join('-')).toBe(false);
+  expect(c.join('*')).toBe(false);
+  expect(c.join('/')).toBe(false);
+  expect(c.join('+')).toBe(false);
+  expect(c.join('-')).toBe(false);
+  expect(c.join('*')).toBe(false);
+  expect(c.join('/')).toBe(false);
+  expect(c.text).toBe('');
+
+  c = new CloseBracketToken(null as any);
 
   expect(c.join('1')).toBe(false);
   expect(c.join('2')).toBe(false);

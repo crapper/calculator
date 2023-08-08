@@ -68,7 +68,7 @@ export class StartToken extends Token {
   }
 
   next() {
-    return [NumberToken, BracketToken];
+    return [NumberToken, OpenBracketToken];
   }
 
   get text(): string {
@@ -100,7 +100,7 @@ export class NumberToken extends Token {
   }
 
   next() {
-    return [OperatorToken, BracketToken];
+    return [OperatorToken, OpenBracketToken, CloseBracketToken];
   }
 
   get text(): string {
@@ -138,7 +138,7 @@ export class OperatorToken extends Token {
   }
 
   next() {
-    return [NumberToken, BracketToken];
+    return [NumberToken, OpenBracketToken];
   }
 
   get text(): string {
@@ -150,15 +150,13 @@ export class OperatorToken extends Token {
   }
 }
 
-export class BracketToken extends Token {
+export class OpenBracketToken extends Token {
   private value: string = "";
-  private priority = -1;
 
   constructor(input: Input) { super(input); }
 
   join(char: string): boolean {
-    if (isBracket(char) && this.value === "") {
-      this.priority = 2
+    if (char === "(" && this.value === "") { // allows (( appear
       this.value = char;
       return true;
     }
@@ -166,19 +164,7 @@ export class BracketToken extends Token {
   }
 
   next() {
-    // return [NumberToken, OperatorToken, BracketToken];
-    if (this.value === "(")
-      return [NumberToken, BracketToken];
-    else
-      return [OperatorToken, NumberToken, BracketToken];
-  }
-
-  get isOpening(): boolean {
-    return this.value === "(";
-  }
-
-  get isClosing(): boolean {
-    return this.value === ")";
+    return [NumberToken, OpenBracketToken];
   }
 
   get text(): string {
@@ -186,7 +172,34 @@ export class BracketToken extends Token {
   }
 
   get prior(): number {
-    return this.priority
+    return 2;
+  }
+}
+
+export class CloseBracketToken extends Token {
+  private value: string = "";
+
+  constructor(input: Input) { super(input); }
+
+  join(char: string): boolean {
+    if (char === ")" && this.value === "") { // allows )) appear
+      if (this.input.hasBalancedBracket()) return false;
+      this.value = char;
+      return true;
+    }
+    return false;
+  }
+
+  next() {
+    return [OperatorToken, NumberToken, CloseBracketToken];
+  }
+
+  get text(): string {
+    return this.value;
+  }
+
+  get prior(): number {
+    return 2;
   }
 }
 
@@ -207,7 +220,10 @@ export class Input {
   }
 
   join(char: string): boolean {
-    if (this.tokens.length === 0 || (char === ")" && this.hasBalancedBracket())) {
+    // if (this.tokens.length === 0 || (char === ")" && this.hasBalancedBracket())) {
+    //   return false;
+    // }
+    if (this.tokens.length === 0) {
       return false;
     }
 
@@ -236,6 +252,8 @@ export class Input {
 
     if (this.tokens.at(-1) instanceof OperatorToken) return false;
 
+    this.tokens.forEach((token, index) => {if (token instanceof OpenBracketToken && this.tokens[index + 1] instanceof CloseBracketToken) return false;});
+
     if (this.hasBalancedBracket() === false) return false;
 
     return true;
@@ -246,12 +264,12 @@ export class Input {
       const current = this.tokens[i];
       if (current instanceof NumberToken) {
         const next = this.tokens[i + 1];
-        if (next instanceof BracketToken && next.isOpening) {
+        if (next instanceof OpenBracketToken) {
           let mul = new OperatorToken(this);
           mul.join("*");
           this.tokens.splice(i + 1, 0, mul);
         }
-      } else if (current instanceof BracketToken && current.isClosing) {
+      } else if (current instanceof CloseBracketToken) {
         const next = this.tokens[i + 1];
         if (next instanceof NumberToken) {
           let mul = new OperatorToken(this);
@@ -268,17 +286,15 @@ export class Input {
     for (let i = 0; i < this.tokens.length; i++) {
       if ((this.tokens[i] instanceof NumberToken)) {
         this.postfix_tokens.push(this.tokens[i])
-      } else if ((this.tokens[i] instanceof OperatorToken || this.tokens[i] instanceof BracketToken)) {
-        if (this.tokens[i].text === ')') {
+      } else if ((this.tokens[i] instanceof OperatorToken || this.tokens[i] instanceof CloseBracketToken)) {
           // temp_bracket_len_count = 0
-          while (temp_operator.length !== 0) {
-            if (temp_operator[temp_operator.length - 1].text !== '(') {
-              this.postfix_tokens.push(temp_operator.pop()!)
-              // temp_bracket_len_count++
-            } else {
-              temp_operator.pop()
-              break
-            }
+        while (temp_operator.length !== 0) {
+          if (temp_operator[temp_operator.length - 1].text !== '(') {
+            this.postfix_tokens.push(temp_operator.pop()!)
+            // temp_bracket_len_count++
+          } else {
+            temp_operator.pop()
+            break
           }
           // if (temp_bracket_len_count === 0){
           //   console.log("Error")
@@ -294,7 +310,7 @@ export class Input {
         }
 
         while (temp_operator.length !== 0) {
-          if ((temp_operator[temp_operator.length - 1] as OperatorToken).prior >= (this.tokens[i] as OperatorToken).prior && !(temp_operator[temp_operator.length - 1] instanceof BracketToken) && !(this.tokens[i] instanceof BracketToken)) {
+          if ((temp_operator[temp_operator.length - 1] as OperatorToken).prior >= (this.tokens[i] as OperatorToken).prior && !(temp_operator[temp_operator.length - 1] instanceof OpenBracketToken) && !(this.tokens[i] instanceof OpenBracketToken) && !(temp_operator[temp_operator.length - 1] instanceof CloseBracketToken) && !(this.tokens[i] instanceof CloseBracketToken)) {
             this.postfix_tokens.push(temp_operator.pop()!)
             if (temp_operator.length === 0) {
               temp_operator.push(this.tokens[i])
@@ -358,7 +374,7 @@ export class Input {
     this.preCompile();
 
     const output: NumberToken[] = [];
-    const stack: (BracketToken | OperatorToken)[] = []; // OpenBracket, Operator
+    const stack: (OpenBracketToken | OperatorToken)[] = []; // OpenBracket, Operator
 
     const peek = () => {
       return stack.at(-1);
@@ -370,7 +386,7 @@ export class Input {
 
     const handlePop = () => {
       const op = stack.pop()!;
-      if (op instanceof BracketToken) return undefined;
+      if (op instanceof OpenBracketToken) return undefined;
 
       const b = output.pop()!;
       const a = output.pop()!;
@@ -378,7 +394,7 @@ export class Input {
       return performExpression(a, b, op);
     }
 
-    const handleToken = (token: Token) => { // Number, Operator, OpenBracket  CloseBracket
+    const handleToken = (token: Token) => { // Number, Operator, OpenBracket, CloseBracket
       if (token instanceof NumberToken) {
         out(token);
       } else if (token instanceof OperatorToken) {
@@ -389,19 +405,16 @@ export class Input {
           out(NumberToken.from(handlePop()!));
           o2 = peek();
         }
-
         stack.push(o1);
-      } else if (token instanceof BracketToken) {
-        if (token.isOpening) {
+      } else if (token instanceof OpenBracketToken) {
           stack.push(token);
-        } else {
-          let o2 = peek();
-          while (!(o2 instanceof BracketToken)) {
-            out(NumberToken.from(handlePop()!));
-            o2 = peek();
-          }
-          stack.pop();
+      } else if (token instanceof CloseBracketToken) {
+        let o2 = peek();
+        while (!(o2 instanceof OpenBracketToken)) {
+          out(NumberToken.from(handlePop()!));
+          o2 = peek();
         }
+        stack.pop();
       }
     }
 
